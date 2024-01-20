@@ -368,9 +368,10 @@ def getCache(module, key):
         result = cursor.fetchone()
         if result:
             cache_data = json.loads(result[0])
+            cache_data["time"] = int(cache_data["time"])
             if (not cache_data['expire']):
                 return cache_data
-            if (int(time.time()) < cache_data['time']):
+            if (int(time.time()) < int(cache_data['time'])):
                 return cache_data
     except:
         pass
@@ -390,16 +391,11 @@ def updateCache(module, key, data):
             "SELECT data FROM cache WHERE module=? AND key=?", (module, key))
         result = cursor.fetchone()
         if result:
-            cache_data = json.loads(result[0])
-            if isinstance(cache_data, dict):
-                cache_data.update(data)
-            else:
-                logger.error(
-                    f"Cache data for module '{module}' and key '{key}' is not a dictionary.")
+            cursor.execute(
+                "UPDATE cache SET data = ? WHERE module = ? AND key = ?", (json.dumps(data), module, key))
         else:
             cursor.execute(
                 "INSERT INTO cache (module, key, data) VALUES (?, ?, ?)", (module, key, json.dumps(data)))
-
         conn.commit()
     except:
         logger.error('缓存写入遇到错误…')
