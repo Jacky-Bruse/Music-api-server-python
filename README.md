@@ -1,3 +1,5 @@
+简体中文 | [English](README_EN.md)
+
 <div align="center">
 
 ![lx-music-api-server-python](https://socialify.git.ci/lxmusics/lx-music-api-server-python/image?description=1&font=Inter&forks=1&issues=1&language=1&name=1&owner=1&pulls=1&stargazers=1&theme=Auto)
@@ -15,7 +17,22 @@
 
 由于使用此项目导致的**封号**等情况**与本项目无关**
 
-## 部署方法
+## 💡特点
+
+- [ ] 功能
+  - [ ] 完整性API（歌单，搜索）
+  - [ ] 网易云刷新登录
+  - [ ] 服务器向webdav
+  - [ ] 客户端播放服务器上的本地音乐
+  - [x] Cookie池
+  - [x] https监听，多端口监听
+  - [x] 反代兼容性
+  - [x] 获取更高的音质
+  - [x] QRC解密
+- [ ] 本地化支持（目前仅支持简体中文）
+- [x] 多端部署（`Windows` `Linux` `MacOS`）
+
+## 💻部署方法
 
 ### Release 部署（推荐）
 
@@ -120,7 +137,7 @@ linux 命令如果为 python3 请自行替换
 
 5. 到容器目录里的 `/app` 目录填写 `config.json`
 
-## 返回码说明
+## 📖返回码说明
 
 接口返回值中`body.code`字段值中的代码含义
 
@@ -143,7 +160,7 @@ linux 命令如果为 python3 请自行替换
 | 429  | 请求过于频繁                       |
 | 500  | 服务器内部错误（对应 body.code 4） |
 
-## 备注
+## 🔖备注
 
 ### 本项目中可能会出现以下优秀代码
 
@@ -239,7 +256,7 @@ linux 命令如果为 python3 请自行替换
     f = e(c, b, a)
     ```
 
-## 项目协议
+## 📄项目协议
 
 本项目基于 [MIT](https://github.com/lxmusics/lx-music-api-server/blob/main/LICENSE) 许可证发行，以下协议是对于 MIT 原协议的补充，如有冲突，以以下协议为准。
 
@@ -259,10 +276,10 @@ helloplhm-qwq+outlook.com
 folltoshe+foxmail.com  
 (请将`+`替换成`@`)
 
-## Star 趋势图
+## ✨Star 趋势图
 
 [![Stargazers over time](https://starchart.cc/lxmusics/lx-music-api-server-python.svg)](https://starchart.cc/lxmusics/lx-music-api-server-python)
 
-## 贡献者
+## ⚙️贡献者
 
 [![Contributor](https://contrib.rocks/image?repo=lxmusics/lx-music-api-server-python)](https://github.com/lxmusics/lx-music-api-server-python/graphs/contributors)
