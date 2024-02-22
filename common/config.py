@@ -13,6 +13,7 @@ import os
 import traceback
 import sys
 import sqlite3
+import shutil
 from . import variable
 from .log import log
 import threading
@@ -22,11 +23,10 @@ logger = log('config_manager')
 # 创建线程本地存储对象
 local_data = threading.local()
 
-
 def get_data_connection():
     # 检查线程本地存储对象是否存在连接对象，如果不存在则创建一个新的连接对象
-    if not hasattr(local_data, 'connection'):
-        local_data.connection = sqlite3.connect('data.db')
+    if (not hasattr(local_data, 'connection')):
+        local_data.connection = sqlite3.connect('./config/data.db')
     return local_data.connection
 
 
@@ -37,7 +37,7 @@ local_cache = threading.local()
 def get_cache_connection():
     # 检查线程本地存储对象是否存在连接对象，如果不存在则创建一个新的连接对象
     if not hasattr(local_cache, 'connection'):
-        local_cache.connection = sqlite3.connect('cache.db')
+        local_cache.connection = sqlite3.connect('./cache.db')
     return local_cache.connection
 
 
@@ -320,7 +320,7 @@ default = {
 
 
 def handle_default_config():
-    with open("./config.json", "w", encoding="utf-8") as f:
+    with open("./config/config.json", "w", encoding="utf-8") as f:
         f.write(json.dumps(default, indent=2, ensure_ascii=False,
                 escape_forward_slashes=False))
         f.close()
@@ -512,7 +512,7 @@ def push_to_list(key, obj):
 
 def write_config(key, value):
     config = None
-    with open('config.json', 'r', encoding='utf-8') as f:
+    with open('./config/config.json', 'r', encoding='utf-8') as f:
         config = json.load(f)
 
     keys = key.split('.')
@@ -524,7 +524,7 @@ def write_config(key, value):
 
     current[keys[-1]] = value
     variable.config = config
-    with open('config.json', 'w', encoding='utf-8') as f:
+    with open('./config/config.json', 'w', encoding='utf-8') as f:
         json.dump(config, f, indent=2, ensure_ascii=False,
                   escape_forward_slashes=False)
         f.close()
@@ -620,19 +620,26 @@ def write_data(key, value):
 
 
 def initConfig():
+    if (not os.path.exists('./config')):
+        os.mkdir('config')
+        if (os.path.exists('./config.json')):
+            shutil.move('config.json','./config')
+        if (os.path.exists('./data.db')):
+            shutil.move('./data.db','./config')
+
     try:
-        with open("./config.json", "r", encoding="utf-8") as f:
+        with open("./config/config.json", "r", encoding="utf-8") as f:
             try:
                 variable.config = json.loads(f.read())
                 if (not isinstance(variable.config, dict)):
                     logger.warning('配置文件并不是一个有效的字典，使用默认值')
                     variable.config = default
-                    with open("./config.json", "w", encoding="utf-8") as f:
+                    with open("./config/config.json", "w", encoding="utf-8") as f:
                         f.write(json.dumps(variable.config, indent=2,
                                 ensure_ascii=False, escape_forward_slashes=False))
                         f.close()
             except:
-                if os.path.getsize("./config.json") != 0:
+                if os.path.getsize("./config/config.json") != 0:
                     logger.error("配置文件加载失败，请检查是否遵循JSON语法规范")
                     sys.exit(1)
                 else:
@@ -643,7 +650,7 @@ def initConfig():
     variable.log_length_limit = read_config('common.log_length_limit')
     variable.debug_mode = read_config('common.debug_mode')
     logger.debug("配置文件加载成功")
-    conn = sqlite3.connect('cache.db')
+    conn = sqlite3.connect('./cache.db')
 
     # 创建一个游标对象
     cursor = conn.cursor()
@@ -657,7 +664,7 @@ data TEXT NOT NULL)''')
 
     conn.close()
 
-    conn2 = sqlite3.connect('data.db')
+    conn2 = sqlite3.connect('./config/data.db')
 
     # 创建一个游标对象
     cursor2 = conn2.cursor()
