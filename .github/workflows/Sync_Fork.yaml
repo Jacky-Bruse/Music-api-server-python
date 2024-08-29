@@ -41,10 +41,6 @@ jobs:
           exit 1
 
 
-      - name: Notify Telegram
-        run: |
-          MESSAGE="${{ job.status == 'success' && 'Music_API更新成功' || '⚠ Music_API更新失败' }}！"
-          curl -X POST "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage" -d "chat_id=${{ secrets.CHAT_ID }}&text=$MESSAGE" || echo "Failed to send Telegram message"
 
       - name: Delete old workflow runs
         uses: Mattraks/delete-workflow-runs@v2.0.6
