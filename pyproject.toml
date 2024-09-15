@@ -9,7 +9,7 @@ package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.8"
-aiohttp = "^3.10.3"
+aiohttp = "^3.10.5"
 pycryptodome = "^3.20.0"
 ujson = "^5.10.0"
 requests = "^2.32.3"
@@ -20,7 +20,7 @@ pillow = "^10.4.0"
 mutagen = "^1.47.0"
 colorama = "^0.4.6"
 ruamel-yaml = "^0.18.6"
-pybind11 = "^2.13.1"
+pybind11 = "^2.13.5"
 
 [build-system]
 requires = ["poetry-core"]
