@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "lx_music_api_server"
-version = "2.0.0.beta-12"
+version = "2.0.0"
 description = "一个适配 LX Music 的 API 后端实现"
 authors = ["helloplhm-qwq", "lerdb", "Folltoshe"]
 license = "MIT"
@@ -10,7 +10,7 @@ package-mode = false
 [tool.poetry.dependencies]
 python = "^3.8"
 aiohttp = "^3.10.10"
-pycryptodome = "^3.21.0"
+pycryptodome = "^3.22.0"
 ujson = "^5.10.0"
 requests = "^2.32.3"
 colorlog = "^6.9.0"
