@@ -2,12 +2,19 @@ FROM python:3.10-alpine
 
 WORKDIR /app
 
-COPY ./main.py .
-COPY ./common ./common
-COPY ./modules ./modules
-COPY ./requirements.txt .
+COPY pyproject.toml poetry.lock ./
+RUN pip install --no-cache -i https://pypi.mirrors.ustc.edu.cn/simple/ poetry \
+    && poetry config virtualenvs.create false \
+    && poetry install --no-interaction --no-ansi
 
-# 指定源, 如果后期源挂了, 更换个源就可以.
-RUN pip install --no-cache -i https://pypi.mirrors.ustc.edu.cn/simple/  -r requirements.txt
+COPY app.py ./app.py
+COPY api ./api
+COPY crypt ./crypt
+COPY middleware ./middleware
+COPY modules ./modules
+COPY server ./server
+COPY utils ./utils
+COPY static ./static
+COPY res ./res
 
-CMD [ "python", "main.py" ]
+CMD [ "python", "app.py" ]
