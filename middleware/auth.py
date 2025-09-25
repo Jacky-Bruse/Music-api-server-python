@@ -1,4 +1,5 @@
 from fastapi import Request
+from fastapi.responses import JSONResponse
 from server.config import config
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -20,11 +21,14 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if key_verify["enable"] and request.url.path != "/":
             key = request.headers.get("X-Request-Key")
             if key not in key_verify["list"]:
-                return {
-                    "code": 403,
-                    "message": "KEY验证已开启",
-                    "error": "X-Request-Key不在白名单中",
-                }
+                return JSONResponse(
+                    status_code=403,
+                    content={
+                        "code": 403,
+                        "message": "KEY验证已开启",
+                        "error": "X-Request-Key不在白名单中",
+                    }
+                )
 
         response = await call_next(request)
         return response

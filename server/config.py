@@ -128,7 +128,7 @@ class CacheManager:
                 host=host, port=port, username=user, password=password, db=db
             )
             if not client.ping():
-                raise
+                raise ConnectionError("Redis ping 检测失败，连接不可用")
             return client
         except Exception as e:
             self.logger.error(f"连接Redis缓存数据库失败: {e}")

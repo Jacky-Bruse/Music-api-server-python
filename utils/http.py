@@ -58,7 +58,10 @@ def _log_response_content(content: bytes) -> None:
             logger.debug("非文本响应体，不记录")
 
 
-async def HttpRequest(url: str, options: dict = {}) -> httpx.Response:
+async def HttpRequest(url: str, options: dict = None) -> httpx.Response:
+    if options is None:
+        options = {}
+
     if not variable.http_client:
         timeout = httpx.Timeout(10.0, connect=60.0)
         variable.http_client = httpx.AsyncClient(verify=False, timeout=timeout)
@@ -74,6 +77,7 @@ async def HttpRequest(url: str, options: dict = {}) -> httpx.Response:
         req: httpx.Response = await reqattr(url, **options)
     except Exception as e:
         logger.error(f"URL: {url} 请求时遇到错误: {e}")
+        raise  # 重新抛出异常，避免访问未定义的req变量
 
     _log_response_content(req.content)
 
