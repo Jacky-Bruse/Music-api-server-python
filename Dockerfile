@@ -5,7 +5,7 @@ WORKDIR /app
 COPY pyproject.toml poetry.lock ./
 RUN pip install --no-cache -i https://pypi.mirrors.ustc.edu.cn/simple/ poetry \
     && poetry config virtualenvs.create false \
-    && poetry install --no-interaction --no-ansi
+    && poetry install --no-interaction --no-ansi --no-root
 
 COPY app.py ./app.py
 COPY api ./api
