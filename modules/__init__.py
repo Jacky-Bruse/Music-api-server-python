@@ -21,6 +21,11 @@ logger = log.createLogger("Music API Handler")
 CACHE_ENABLE = config.read("cache.enable")
 
 
+def _build_error_message(exc: Exception, default: str) -> str:
+    message = str(exc).strip()
+    return message if message else default
+
+
 def require(module: str):
     index = 0
     module_array = module.split(".")
@@ -148,7 +153,7 @@ async def _url(source: str, songId: str, quality: str) -> dict:
         )
         return {
             "code": 500,
-            "message": f"{e.args[0]}",
+            "message": _build_error_message(e, "获取URL失败"),
         }
 
 
@@ -191,7 +196,7 @@ async def _info(source, songId):
     except getSongInfoFailed as e:
         return {
             "code": 500,
-            "message": e.args[0],
+            "message": _build_error_message(e, "获取歌曲信息失败"),
         }
 
 
@@ -210,7 +215,7 @@ async def _lyric(source, songId):
         except getSongInfoFailed as e:
             return {
                 "code": 500,
-                "message": e.args[0],
+                "message": _build_error_message(e, "获取歌曲信息失败"),
             }
 
     if source == "mg":
@@ -234,7 +239,7 @@ async def _lyric(source, songId):
         except getLyricFailed as e:
             return {
                 "code": 500,
-                "message": e.args[0],
+                "message": _build_error_message(e, "获取歌词失败"),
             }
 
     try:
@@ -265,5 +270,5 @@ async def _lyric(source, songId):
     except getLyricFailed as e:
         return {
             "code": 500,
-            "message": e.args[0],
+            "message": _build_error_message(e, "获取歌词失败"),
         }

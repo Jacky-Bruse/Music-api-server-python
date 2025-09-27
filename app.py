@@ -7,6 +7,7 @@ from middleware.request_logger import RequestLoggerMiddleware
 
 from fastapi import FastAPI
 from fastapi import Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from contextlib import asynccontextmanager
@@ -88,7 +89,9 @@ if config.read("module.qmc_decrypter"):
 @app.exception_handler(Exception)
 async def globalErrorHandler(request: Request, exc: Exception):
     logger.error(f"未处理的异常")
-    return {"code": 500, "message": f"未处理的异常: {exc}"}
+    return JSONResponse(
+        {"code": 500, "message": f"未处理的异常: {exc}"}, status_code=500
+    )
 
 
 from io import TextIOWrapper
