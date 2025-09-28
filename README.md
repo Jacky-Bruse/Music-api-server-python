@@ -67,9 +67,10 @@ PS: 主开发(@helloplhm-qwq)因学业原因无法维护项目, 在 2026 年 6 �
    
 
 ## 使用：
-ip:port/script
-可以在洛雪软件设置在线导入音源，输入：<域名>/script
-或者内网设备在线导入：ip:port/script
+
+ip:port/script  
+可以在洛雪软件设置在线导入音源，输入：<域名>/script  
+或者内网设备在线导入：ip:port/script  
 
 ## 📄 项目协议
 
