@@ -54,7 +54,6 @@ async def _url(source: str, songId: str, quality: str) -> dict:
         try:
             cache = cacheM.get("urls", f"{source}_{songId}_{quality}")
             if cache:
-                cache = dict(cache)
                 logger.info(
                     f"使用缓存的{sourceNameTranslate[source]}_{songId}_{QualityNameTranslate[quality]}数据, URL: {cache['url']['url']}"
                 )
@@ -79,9 +78,9 @@ async def _url(source: str, songId: str, quality: str) -> dict:
                         ),
                     },
                 }
-        except Exception:
-            logger.error(
-                f"获取缓存{sourceNameTranslate[source]}_{songId}_{QualityNameTranslate[quality]}失败"
+        except Exception as e:
+            logger.warning(
+                f"读取缓存{sourceNameTranslate[source]}_{songId}_{QualityNameTranslate[quality]}失败: {e}, 将重新请求"
             )
 
     try:
@@ -98,13 +97,7 @@ async def _url(source: str, songId: str, quality: str) -> dict:
             result: UrlResponse = result.url
 
         logger.info(
-            "获取%s_%s_%s成功, URL: %s"
-            % (
-                sourceNameTranslate[source],
-                songId,
-                QualityNameTranslate[quality],
-                result.url,
-            )
+            f"获取{sourceNameTranslate[source]}_{songId}_{QualityNameTranslate[quality]}成功, URL: {result.url}"
         )
         canExpire = sourceExpirationTime[source]["expire"]
         expireTime = int(sourceExpirationTime[source]["time"] * 0.75)
@@ -121,14 +114,7 @@ async def _url(source: str, songId: str, quality: str) -> dict:
                 expireTime if canExpire else None,
             )
             logger.info(
-                "缓存已更新: %s_%s_%s, URL: %s, Expire: %s"
-                % (
-                    sourceNameTranslate[source],
-                    songId,
-                    QualityNameTranslate[quality],
-                    result.url,
-                    time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(expireAt)),
-                )
+                f"缓存已更新: {sourceNameTranslate[source]}_{songId}_{QualityNameTranslate[quality]}, URL: {result.url}, Expire: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(expireAt))}"
             )
 
         return {
@@ -158,12 +144,14 @@ async def _url(source: str, songId: str, quality: str) -> dict:
 
 
 async def _info(source, songId):
-    try:
-        cache = cacheM.get("info", f"{source}_{songId}")
-        if cache:
-            return {"code": 200, "message": "成功", "data": cache["data"]}
-    except:
-        pass
+    if CACHE_ENABLE:
+        try:
+            cache = cacheM.get("info", f"{source}_{songId}")
+            if cache:
+                logger.debug(f"使用缓存的{sourceNameTranslate[source]}_{songId}歌曲信息")
+                return {"code": 200, "message": "成功", "data": cache["data"]}
+        except Exception as e:
+            logger.warning(f"读取缓存{sourceNameTranslate[source]}_{songId}信息失败: {e}, 将重新请求")
 
     try:
         func = require("modules.info." + source + ".getMusicInfo")
@@ -201,12 +189,14 @@ async def _info(source, songId):
 
 
 async def _lyric(source, songId):
-    try:
-        cache = cacheM.get("lyric", f"{source}_{songId}")
-        if cache:
-            return {"code": 200, "message": "success", "data": cache["data"]}
-    except:
-        pass
+    if CACHE_ENABLE:
+        try:
+            cache = cacheM.get("lyric", f"{source}_{songId}")
+            if cache:
+                logger.debug(f"使用缓存的{sourceNameTranslate[source]}_{songId}歌词")
+                return {"code": 200, "message": "success", "data": cache["data"]}
+        except Exception as e:
+            logger.warning(f"读取缓存{sourceNameTranslate[source]}_{songId}歌词失败: {e}, 将重新请求")
 
     if source == "tx":
         try:

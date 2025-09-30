@@ -4,7 +4,7 @@ from .http import HttpRequest
 
 async def getIPInfo(ip: str) -> dict:
     try:
-        if ip == ("127.0.0.1" or "::1"):
+        if ip in ("127.0.0.1", "::1"):
             return {"ip": ip, "local": "本地IP"}
 
         req = await HttpRequest(
