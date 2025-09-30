@@ -27,7 +27,8 @@ class RequestLoggerMiddleware(BaseHTTPMiddleware):
 
         try:
             ip_info = await getIPInfo(request.state.remote_addr)
-        except:
+        except Exception as e:
+            logger.debug(f"获取IP信息失败 {request.state.remote_addr}: {e}")
             ip_info = {"local": "Unknown"}
 
         logger.info(

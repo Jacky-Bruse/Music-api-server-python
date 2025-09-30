@@ -85,7 +85,8 @@ async def _url(source: str, songId: str, quality: str) -> dict:
 
     try:
         func = require(f"modules.url.{source}.getUrl")
-    except:
+    except (ImportError, AttributeError) as e:
+        logger.error(f"模块加载失败 modules.url.{source}.getUrl: {e}")
         return {
             "code": 404,
             "message": "未知的源或不支持的方法",
@@ -155,7 +156,8 @@ async def _info(source, songId):
 
     try:
         func = require("modules.info." + source + ".getMusicInfo")
-    except:
+    except (ImportError, AttributeError) as e:
+        logger.error(f"模块加载失败 modules.info.{source}.getMusicInfo: {e}")
         return {
             "code": 404,
             "message": "未知的源或不支持的方法",
@@ -234,7 +236,8 @@ async def _lyric(source, songId):
 
     try:
         func = require("modules.lyric." + source + ".getLyric")
-    except:
+    except (ImportError, AttributeError) as e:
+        logger.error(f"模块加载失败 modules.lyric.{source}.getLyric: {e}")
         return {
             "code": 404,
             "message": "未知的源或不支持的方法",

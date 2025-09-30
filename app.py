@@ -109,5 +109,7 @@ async def Init():
 if __name__ == "__main__":
     try:
         asyncio.run(Init())
-    except:
-        pass
+    except KeyboardInterrupt:
+        logger.info("收到退出信号,服务器已停止")
+    except Exception as e:
+        logger.error(f"服务器异常退出: {e}")
