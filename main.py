@@ -1,20 +1,18 @@
+try:
+    from fastapi import FastAPI
+    from fastapi import Request
+    from shared import Dossier, HOME
+except:
+    raise ImportError("Please run 'uv sync' to install packages.")
+
 import asyncio
-
+from pathlib import Path
 from api import home_handler, gcsp_handler, script_handler, music_handler
-
 from middleware.auth import AuthMiddleware
 from middleware.request_logger import RequestLoggerMiddleware
-
-from fastapi import FastAPI
-from fastapi import Request
-from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
-
 from contextlib import asynccontextmanager
-
 import uvicorn
 from uvicorn.config import Config
-
 from server import variable
 from server.config import config
 from utils import scheduler, log
@@ -24,21 +22,20 @@ logger = log.createLogger("FastAPI")
 
 async def clean():
     if variable.http_client:
-        await variable.http_client.aclose()
+        await variable.http_client.connector.close()
+        await variable.http_client.close()
+
+    path = Path(HOME, "my_dossier")
+    dossier = Dossier(path)
+    dossier.set("registered", {"ok": False})
+
     logger.info("等待部分进程暂停...")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info(f"服务器启动于http://{server.config.host}:{server.config.port}")
-    print(
-        f"已加载\n"
-        f"酷狗音乐账号{len(config.read('module.platform.kg.users') or [])}个\n"
-        f"QQ音乐账号{len(config.read('module.platform.tx.users') or [])}个\n"
-        f"网易云音乐账号{len(config.read('module.platform.wy.users') or [])}个\n"
-        f"咪咕音乐账号{len(config.read('module.platform.mg.users') or [])}个"
-    )
     await scheduler.run()
+
     yield
 
     await clean()
@@ -53,23 +50,13 @@ app = FastAPI(
 )
 
 uvicorn_config = Config(
-    "app:app",
+    "main:app",
     host=config.read("server.host"),
     port=config.read("server.port"),
     reload=config.read("server.reload"),
     workers=config.read("server.workers"),
-    log_config=None,
-    log_level=None,
-    access_log=False,
 )
 server = uvicorn.Server(config=uvicorn_config)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 app.add_middleware(AuthMiddleware)
 app.add_middleware(RequestLoggerMiddleware)
@@ -99,17 +86,8 @@ for f in variable.log_files:
         f.close()
 
 
-async def Init():
-    try:
-        await server.serve()
-    except Exception as e:
-        logger.error(e)
-
-
 if __name__ == "__main__":
     try:
-        asyncio.run(Init())
-    except KeyboardInterrupt:
-        logger.info("收到退出信号,服务器已停止")
-    except Exception as e:
-        logger.error(f"服务器异常退出: {e}")
+        asyncio.run(server.serve())
+    except:
+        pass

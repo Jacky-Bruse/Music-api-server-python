@@ -1,7 +1,9 @@
 import zlib
-import httpx
 import random
 import ujson
+import aiohttp
+
+from utils.dns import DNSResolver, aiohttpResolver
 
 from .text import *
 from .log import createLogger
@@ -58,15 +60,42 @@ def _log_response_content(content: bytes) -> None:
             logger.debug("非文本响应体，不记录")
 
 
-async def HttpRequest(url: str, options: dict = None) -> httpx.Response:
-    if options is None:
-        options = {}
+class Response:
+    def __init__(self, status: int, content: bytes, headers: dict):
+        self.status_code = status
+        self.content = content
+        self.headers = headers
+        self.text = content.decode("utf-8", errors="ignore")
 
+    def json(self):
+        try:
+            return ujson.loads(self.content)
+        except:
+            return {}
+
+
+async def convert_to_requests_response(
+    resp: aiohttp.ClientResponse,
+) -> Response:
+    content = await resp.content.read()
+    headers = dict(resp.headers.items())
+
+    return Response(resp.status, content, headers)
+
+
+async def HttpRequest(url: str, options: dict = {}) -> Response:
     if not variable.http_client:
-        timeout = httpx.Timeout(10.0, connect=60.0)
-        variable.http_client = httpx.AsyncClient(verify=False, timeout=timeout)
+        variable.http_client = aiohttp.ClientSession(
+            connector=aiohttp.TCPConnector(
+                ssl=False,
+                resolver=aiohttpResolver(DNSResolver()),
+            ),
+            timeout=aiohttp.ClientTimeout(3.0, connect=5.0),
+        )
 
     method, options = _prepare_options(options)
+
+    logger.debug(f"请求开始, Method: {method}, URL: {url}, Options: {options}")
 
     try:
         reqattr = getattr(variable.http_client, method.lower())
@@ -74,11 +103,11 @@ async def HttpRequest(url: str, options: dict = None) -> httpx.Response:
         raise AttributeError(f"不支持的类型: {method}")
 
     try:
-        req: httpx.Response = await reqattr(url, **options)
+        resp: aiohttp.ClientResponse = await reqattr(url, **options)
+        resp.raise_for_status()
+        req = await convert_to_requests_response(resp)
+        _log_response_content(req.content)
+        return req
     except Exception as e:
         logger.error(f"URL: {url} 请求时遇到错误: {e}")
-        raise  # 重新抛出异常，避免访问未定义的req变量
-
-    _log_response_content(req.content)
-
-    return req
+        raise e
