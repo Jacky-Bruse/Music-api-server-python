@@ -16,7 +16,22 @@ from . import lyric
 from . import info
 
 logger = log.createLogger("Music API Handler")
-CACHE_ENABLE = config.read("cache.enable")
+
+
+def isCacheEnabled():
+    """检查缓存是否启用且可用"""
+    try:
+        if cacheM is None:
+            return False
+        enable_value = config.read("cache.enable")
+        # 兼容多种真值表示：True, "true", 1, "1"
+        # 明确排除假值：False, "false", 0, "0", None, ""
+        if enable_value in (True, "true", "True", 1, "1"):
+            return True
+        return False
+    except Exception as e:
+        logger.warning(f"检查缓存状态失败: {e}")
+        return False
 
 
 def _build_error_message(exc: Exception, default: str) -> str:
@@ -41,7 +56,7 @@ async def getUrlForAPI(source: str, songId: str, quality: str) -> dict:
     if quality == "flac24bit":
         quality = "hires"
 
-    if CACHE_ENABLE:
+    if isCacheEnabled():
         try:
             cache = cacheM.get("urls", f"{source}_{songId}_{quality}")
             if cache:
@@ -96,7 +111,7 @@ async def getUrlForAPI(source: str, songId: str, quality: str) -> dict:
             True if expireTime != 0 else False,
         )
         expireAt = int(expireTime + time.time())
-        if CACHE_ENABLE:
+        if isCacheEnabled():
             cacheM.set(
                 "urls",
                 f"{source}_{songId}_{quality}",
@@ -138,7 +153,7 @@ async def getUrlForAPI(source: str, songId: str, quality: str) -> dict:
 
 
 async def getSongInfoForAPI(source, songId):
-    if CACHE_ENABLE:
+    if isCacheEnabled():
         try:
             cache = cacheM.get("info", f"{source}_{songId}")
             if cache:
@@ -163,7 +178,7 @@ async def getSongInfoForAPI(source, songId):
             result: SongInfo = await func(songId)
         expireTime = 86400 * 3
         expireAt = int(time.time() + expireTime)
-        if CACHE_ENABLE:
+        if isCacheEnabled():
             cacheM.set(
                 "info",
                 f"{source}_{songId}",
@@ -184,7 +199,7 @@ async def getSongInfoForAPI(source, songId):
 
 
 async def getLyricForAPI(source, songId):
-    if CACHE_ENABLE:
+    if isCacheEnabled():
         try:
             cache = cacheM.get("lyric", f"{source}_{songId}")
             if cache:
@@ -209,17 +224,18 @@ async def getLyricForAPI(source, songId):
             result = song.info.lyric
             expireTime = 86400 * 3
             expireAt = int(time.time() + expireTime)
-            cacheM.set(
-                "lyric",
-                f"{source}_{songId}",
-                {
-                    "data": result,
-                    "time": expireAt,
-                    "expire": True,
-                },
-                expireTime,
-            )
-            logger.debug(f"缓存已更新：{source}_{songId}, lyric: {result}")
+            if isCacheEnabled():
+                cacheM.set(
+                    "lyric",
+                    f"{source}_{songId}",
+                    {
+                        "data": result,
+                        "time": expireAt,
+                        "expire": True,
+                    },
+                    expireTime,
+                )
+                logger.debug(f"缓存已更新：{source}_{songId}, lyric: {result}")
             return {"code": 200, "message": "成功", "data": result}
         except getLyricFailed as e:
             return {
@@ -240,7 +256,7 @@ async def getLyricForAPI(source, songId):
         result = await func(songId)
         expireTime = 86400 * 3
         expireAt = int(time.time() + expireTime)
-        if CACHE_ENABLE:
+        if isCacheEnabled():
             cacheM.set(
                 "lyric",
                 f"{source}_{songId}",

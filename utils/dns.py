@@ -93,9 +93,10 @@ class DNSResolver:
         :param ipv6_enable: 是否启用 IPv6，如果为 None，则自动检测。
         :param cache_ttl: 缓存时长，单位为秒（默认 600 秒）。
         """
+        doh_config = config.read("module.doh")
         self.doh = (
-            config.read("module.doh")
-            if len(config.read("module.doh")) != 0
+            doh_config
+            if doh_config and isinstance(doh_config, list) and len(doh_config) > 0
             else ["https://dns.alidns.com/dns-query"]
         )
         self.ipv6_enable = (
