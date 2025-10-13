@@ -1,6 +1,7 @@
 try:
     from fastapi import FastAPI
     from fastapi import Request
+    from fastapi.responses import JSONResponse
     from shared import Dossier, HOME
 except:
     raise ImportError("Please run 'uv sync' to install packages.")
