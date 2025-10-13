@@ -71,16 +71,19 @@ class ConfigManager:
                 if isinstance(value, dict):
                     if k not in value and keys.index(k) != len(keys) - 1:
                         value[k] = {}
+                        value = value[k]
                     elif k not in value and keys.index(k) == len(keys) - 1:
                         value = None
-                    value = value[k]
+                        break
+                    else:
+                        value = value[k]
                 else:
                     value = None
                     break
 
             return value
         except BaseException as e:
-            self.logger.error("配置读取失败...")
+            self.logger.error(f"配置读取失败: key={key}, error={e}")
             raise ConfigReadException(e)
 
     def write(self, key: str, value: str | dict | list):
