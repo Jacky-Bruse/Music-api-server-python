@@ -26,9 +26,15 @@ jobs:
         context: .
         platforms: linux/amd64,linux/arm64
         push: true
-        tags: leejacky/music-api:latest
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+        tags: |
+          leejacky/music-api:latest
+          leejacky/music-api:${{ github.sha }}
+        cache-from: |
+          type=gha
+          type=registry,ref=leejacky/music-api:buildcache
+        cache-to: |
+          type=gha,mode=max
+          type=registry,ref=leejacky/music-api:buildcache,mode=max
 
     - name: Notify Telegram
       run: |
