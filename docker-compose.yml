@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  # LX Music API 服务
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lx-music-api-server
+    ports:
+      - "9000:9000"
+    volumes:
+      # 挂载配置和数据目录（持久化配置文件）
+      - ./data:/app/data
+      # 挂载日志目录（可选，如果需要查看日志）
+      - ./logs:/app/logs
+    environment:
+      # 设置时区
+      - TZ=Asia/Shanghai
+    restart: unless-stopped
+    depends_on:
+      - redis
+    networks:
+      - lx-music-network
+
+  # Redis 缓存服务
+  redis:
+    image: redis:7-alpine
+    container_name: lx-music-redis
+    command: redis-server --appendonly yes
+    volumes:
+      # 持久化 Redis 数据
+      - ./redis-data:/data
+    restart: unless-stopped
+    networks:
+      - lx-music-network
+
+networks:
+  lx-music-network:
+    driver: bridge
