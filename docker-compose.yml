@@ -3,9 +3,7 @@ version: '3.8'
 services:
   # LX Music API 服务
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: leejacky/music-api:latest
     container_name: lx-music-api-server
     ports:
       - "9000:9000"
