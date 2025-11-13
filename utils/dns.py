@@ -6,7 +6,7 @@ import asyncio
 import socket
 import time
 import base64
-import ujson
+from utils import orjson
 import struct
 import dns.message
 
@@ -93,7 +93,7 @@ class DNSResolver:
         :param ipv6_enable: 是否启用 IPv6，如果为 None，则自动检测。
         :param cache_ttl: 缓存时长，单位为秒（默认 600 秒）。
         """
-        doh_config = config.read("module.doh")
+        doh_config = config.read("modules.doh")
         self.doh = (
             doh_config
             if doh_config and isinstance(doh_config, list) and len(doh_config) > 0
@@ -198,9 +198,9 @@ class DNSResolver:
                 if response.content_type.endswith("json"):
                     # 如果是 JSON 格式，使用 JSON 解析
                     try:
-                        data = ujson.loads(content.decode("utf-8"))
+                        data = orjson.loads(content.decode("utf-8"))
                         return data.get("Answer", [])
-                    except ujson.JSONDecodeError as e:
+                    except orjson.JSONDecodeError as e:
                         logger.error(f"JSON decode error: {e}")
                         raise DNSException(host, f"{record_type}: JSON_PARSE_ERROR")
                 else:
