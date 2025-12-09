@@ -58,7 +58,7 @@ async def signRequest(data):
     else:
         body = orjson.dumps(data)
         return await HttpRequest(
-            "https://u.y.qq.com/cgi-bin/musics.fcg" + signBody(body),
+            "https://u.y.qq.com/cgi-bin/musics.fcg?sign=" + signBody(body),
             {
                 "method": "POST",
                 "body": body,
