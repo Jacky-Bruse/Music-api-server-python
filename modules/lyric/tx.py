@@ -1,10 +1,11 @@
 import re
 import zlib
-from modules.plat.tx.utils import signRequest
-from modules.plat.tx import build_comm
-from server.exceptions import getLyricFailed
-from crypt.des import tripledes_key_setup, tripledes_crypt, DECRYPT
-from utils import convertLxlyricToElyric
+
+from utils.crypt.des import tripledes_key_setup, tripledes_crypt, DECRYPT
+from server.exceptions import FailedException
+from server.models.music import Lyric
+from utils.platform.tx import build_comm
+from utils.platform.tx import sign_request
 
 
 def qrc_decrypt(encrypted_qrc: str | bytearray | bytes) -> str:
@@ -22,7 +23,7 @@ def qrc_decrypt(encrypted_qrc: str | bytearray | bytes) -> str:
         schedule = tripledes_key_setup(b"!@#)(*$%123ZXC!@!@#)(NHL", DECRYPT)
 
         for i in range(0, len(encrypted_qrc), 8):
-            data += tripledes_crypt(encrypted_qrc[i : i + 8], schedule)
+            data += tripledes_crypt(encrypted_qrc[i: i + 8], schedule)
 
         return zlib.decompress(data).decode("utf-8")
     except Exception as e:
@@ -201,21 +202,20 @@ class ParseTools:
         return "\n".join(newLrc)
 
     def parse(self, lrc, tlrc=None, rlrc=None):
-        info = {"lyric": "", "tlyric": "", "rlyric": "", "lxlyric": "", "elyric": ""}
+        info = Lyric(lyric="", trans=None, roma=None, chase=None)
 
         if lrc:
             parsed_lrc = self.parseLyric(self.removeTag(lrc))
-            info["lyric"] = parsed_lrc["lyric"]
-            info["lxlyric"] = parsed_lrc["lxlyric"]
-            info["elyric"] = convertLxlyricToElyric(parsed_lrc["lxlyric"])
+            info.lyric = parsed_lrc["lyric"]
+            info.chase = parsed_lrc["lxlyric"]
 
         if rlrc:
-            info["rlyric"] = self.fixRlrcTimeTag(
-                self.parseRlyric(self.removeTag(rlrc)), info["lyric"]
+            info.roma = self.fixRlrcTimeTag(
+                self.parseRlyric(self.removeTag(rlrc)), info.lyric
             )
 
         if tlrc:
-            info["tlyric"] = self.fixTlrcTimeTag(tlrc, info["lyric"])
+            info.trans = self.fixTlrcTimeTag(tlrc, info.lyric)
 
         return info
 
@@ -229,7 +229,7 @@ def parseLyric(l, t="", r=""):
 
 async def getLyric(songId):
     commparams = await build_comm()
-    req = await signRequest(
+    req = await sign_request(
         {
             "comm": commparams,
             "req": {
@@ -257,14 +257,14 @@ async def getLyric(songId):
     body = req.json()
 
     if (body["code"] != 0) or (body["req"]["code"] != 0):
-        raise getLyricFailed("歌词获取失败")
+        raise FailedException("歌词获取失败")
 
     l = body["req"]["data"]["lyric"]
     t = body["req"]["data"]["trans"]
     r = body["req"]["data"]["roma"]
 
     if l.startswith("789C") and len(l) < 200:
-        raise getLyricFailed("纯音乐短歌词不受支持")
+        raise FailedException("纯音乐短歌词不受支持")
 
     dl = qrc_decrypt(l)
     if t:

@@ -1,9 +1,10 @@
 import time
+
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
-from server.config import config
-from utils.log import createLogger
-from utils.ip import getIPInfo
+
+from utils.server.ip import getIPInfo
+from utils.server.log import createLogger
 
 logger = createLogger("RequestLogger")
 
@@ -14,26 +15,16 @@ class RequestLoggerMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         start_time = time.perf_counter()
 
-        if config.read("server.reverse_proxy"):
-            request.state.remote_addr = str(
-                request.headers[config.read("server.real_ip")]
-            )
-            request.state.host = request.base_url.hostname
-            request.state.proto = str(request.headers[config.read("server.proto")])
-        else:
-            request.state.remote_addr = request.client.host
-            request.state.host = request.base_url.hostname
-            request.state.proto = request.base_url.scheme
-
         try:
-            ip_info = await getIPInfo(request.state.remote_addr)
+            ip_info = await getIPInfo(request.state.ip)
         except:
             ip_info = {"local": "Unknown"}
 
         logger.info(
-            f"收到请求: {request.method} - {request.state.remote_addr} - "
+            f"收到请求: {request.method} - {request.state.ip} - "
             f"{ip_info['local']} - {request.url.path} - "
-            f"{request.headers.get('User-Agent', '')} - "
+            f"{request.query_params} - "
+            f"{request.state.ua}"
         )
 
         response = await call_next(request)

@@ -1,11 +1,12 @@
 import re
 import zlib
-from utils import orjson
-from server.exceptions import getLyricFailed
+
 from modules.info.kg import getMusicInfo
-from utils import http
-from utils.url import encodeURI
-from utils.base64 import createBase64Decode
+from server.exceptions import FailedException
+from utils.encode import json
+from utils.encode.base64 import createBase64Decode
+from utils.encode.url import encodeURI
+from utils.server import http
 
 
 class ParseTools:
@@ -17,13 +18,12 @@ class ParseTools:
         if re.match(self.head_exp, string):
             string = re.sub(self.head_exp, "", string)
         trans = re.search(r"\[language:([\w=\\/+]+)\]", string)
-        lyric = None
         rlyric = None
         tlyric = None
         if trans:
             string = re.sub(r"\[language:[\w=\\/+]+\]\n", "", string)
             decoded_trans = createBase64Decode(trans.group(1)).decode("utf-8")
-            trans_json = orjson.loads(decoded_trans)
+            trans_json = json.loads(decoded_trans)
             for item in trans_json["content"]:
                 if item["type"] == 0:
                     rlyric = item["lyricContent"]
@@ -94,11 +94,11 @@ def krcDecode(a: bytes):
 async def lyricSearchByHash(hash_):
     _, musicInfo = await getMusicInfo(hash_)
     if not musicInfo:
-        raise getLyricFailed("歌曲信息获取失败")
+        raise FailedException("歌曲信息获取失败")
     hash_new = musicInfo["audio_info"]["hash"]
     name = musicInfo["songname"]
     timelength = int(musicInfo["audio_info"]["timelength"]) // 1000
-    req = await http.HttpRequest(
+    req = await http.send_http_request(
         encodeURI(
             "http://lyrics.kugou.com/search?ver=1&man=yes&client=pc&keyword="
             + name
@@ -107,15 +107,12 @@ async def lyricSearchByHash(hash_):
             + "&timelength="
             + str(timelength)
         ),
-        {
-            "method": "GET",
-        },
     )
     body = req.json()
     if body["status"] != 200:
-        raise getLyricFailed("歌词获取失败")
+        raise FailedException("歌词获取失败")
     if not body["candidates"]:
-        raise getLyricFailed("歌词获取失败: 当前歌曲无歌词")
+        raise FailedException("歌词获取失败: 当前歌曲无歌词")
     lyric = body["candidates"][0]
     return lyric["id"], lyric["accesskey"]
 
@@ -124,18 +121,15 @@ async def getLyric(hash_):
     try:
         lyric_id, accesskey = await lyricSearchByHash(hash_)
     except:
-        raise getLyricFailed("未检索到歌词")
+        raise FailedException("未检索到歌词")
 
-    req = await http.HttpRequest(
+    req = await http.send_http_request(
         f"http://lyrics.kugou.com/download?ver=1&client=pc&id={lyric_id}&accesskey={accesskey}",
-        {
-            "method": "GET",
-        },
     )
     body = req.json()
 
     if body["status"] != 200 or body["error_code"] != 0 or (not body["content"]):
-        raise getLyricFailed("歌词获取失败")
+        raise FailedException("歌词获取失败")
 
     content = createBase64Decode(body["content"])
     content = krcDecode(content)

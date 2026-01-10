@@ -1,14 +1,15 @@
-import time
 import base64
 import hashlib
-from utils import orjson
-from utils.log import createLogger
-from server.config import config
-from modules.plat.kg.utils import signRequest, tools
+import time
 
-from Crypto.PublicKey import RSA
 from Crypto.Cipher import AES
+from Crypto.PublicKey import RSA
 from Crypto.Util.Padding import pad, unpad
+
+from server.config import config
+from utils.encode import json
+from utils.platform.kg import sign_request, tools
+from utils.server.log import createLogger
 
 logger = createLogger("Refresh Login")
 
@@ -35,7 +36,7 @@ def randomString(length: int) -> str:
 
 def cryptoAesEncrypt(data: str | dict, key: str = None, iv: str = None) -> dict | str:
     if isinstance(data, dict):
-        data = orjson.dumps(data)
+        data = json.dumps(data)
 
     if key is None:
         temp_key = randomString(16).lower()
@@ -75,7 +76,7 @@ def cryptoAesDecrypt(data: str, key: str, iv: str = None) -> dict | str:
     try:
         result_str = decrypted.decode("utf-8")
         try:
-            return orjson.loads(result_str)
+            return json.loads(result_str)
         except:
             return result_str
     except:
@@ -84,7 +85,7 @@ def cryptoAesDecrypt(data: str, key: str, iv: str = None) -> dict | str:
 
 def cryptoRSAEncrypt(data: dict | str) -> str:
     if isinstance(data, dict):
-        data = orjson.dumps(data)
+        data = json.dumps(data)
 
     data_bytes = data.encode("utf-8")
 
@@ -100,7 +101,7 @@ def cryptoRSAEncrypt(data: dict | str) -> str:
     return encrypted.hex()
 
 
-async def refreshLogin(user_info):
+async def refresh_login(user_info):
     userid = user_info["userid"]
     token = user_info["token"]
 
@@ -127,7 +128,7 @@ async def refreshLogin(user_info):
         }
     )
 
-    req = await signRequest(
+    req = await sign_request(
         "http://gateway.kugou.com/v5/login_by_token",
         {
             "dfid": "-",
@@ -179,8 +180,8 @@ async def refreshLogin(user_info):
             encryptParams["key"],
         )
 
-        user_list = config.read("modules.platform.kg.users")
+        user_list = config.get("modules.platform.kg.users")
         user_list[user_list.index(user_info)]["token"] = decrypted_token["token"]
 
-        config.write("modules.platform.kg.users", user_list)
+        config.set("modules.platform.kg.users", user_list)
         logger.info(f"为酷狗音乐账号(UID_{userid})数据更新完毕")
