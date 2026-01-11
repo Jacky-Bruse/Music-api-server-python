@@ -1,12 +1,12 @@
 import random
-from server.config import config
-from server.models import UrlResponse
-from server.exceptions import getUrlFailed
-from modules.plat.tx import build_comm
-from modules.info.tx import getMusicInfo
-from modules.plat.tx.utils import signRequest
+
 from modules.constants import translateStrOrInt
-from urllib.parse import urlparse
+from modules.info.tx import getMusicInfo
+from server.config import config
+from server.exceptions import FailedException
+from server.models.music import UrlResponse
+from utils.platform.tx import build_comm
+from utils.platform.tx import sign_request
 
 guidList = [
     "Feixiao",
@@ -47,6 +47,14 @@ qualityMap = {
         "e": ".flac",
         "h": "AI00",
     },
+    "nac": {
+        "e": ".nac",
+        "h": "TL01",
+    },
+    "dts": {
+        "e": ".mp4",
+        "h": "DT03",
+    },
 }
 encryptMap = {
     "128k": {
@@ -77,42 +85,25 @@ encryptMap = {
         "e": ".mflac",
         "h": "AIM0",
     },
+    "nac": {
+        "e": ".mnac",
+        "h": "TLM1",
+    },
+    "dts": {
+        "e": ".mmp4",
+        "h": "DTM3",
+    },
 }
-
-
-def buildUrl(purl: str, guid: str, vkey: str) -> str:
-    params = dict()
-    x = urlparse(purl).query.split("&")
-    for i in x:
-        a, b = i.split("=")
-        params[a] = b
-
-    params["guid"] = guid
-    params["vkey"] = vkey
-    params.pop("redirect")
-
-    cdnaddr = random.choice(config.read("modules.platform.tx.cdns"))
-    filename = urlparse(purl).path
-    purl = "{cdnaddr}{filename}?{params}".format(
-        cdnaddr=cdnaddr,
-        filename=filename,
-        params="&".join([f"{k}={v}" for k, v in params.items()]),
-    )
-
-    return purl
 
 
 async def getUrl(songId: str | int, quality: str) -> UrlResponse:
     try:
-        try:
-            info = await getMusicInfo(songId)
-        except Exception:
-            raise getUrlFailed("详情获取失败")
+        info = await getMusicInfo(songId)
 
-        songId = info.songMid
-        strMediaMid = info.mediaMid
+        songId = info.qq.songMid
+        strMediaMid = info.qq.mediaMid
 
-        user_info = config.read("modules.platform.tx.users")
+        user_info = config.get("modules.platform.tx.users")
         if quality not in ["128k", "320k", "flac", "hires"]:
             user_info = random.choice(
                 [user for user in user_info if user.get("vipType") == "svip"]
@@ -122,7 +113,7 @@ async def getUrl(songId: str | int, quality: str) -> UrlResponse:
 
         comm = await build_comm(user_info)
         guid = random.choice(guidList)
-        resp = await signRequest(
+        resp = await sign_request(
             {
                 "comm": comm,
                 "request": {
@@ -150,13 +141,14 @@ async def getUrl(songId: str | int, quality: str) -> UrlResponse:
 
         purl = str(data["purl"])
         if not purl:
-            raise getUrlFailed(translateStrOrInt(body["request"]["code"]))
+            raise FailedException(translateStrOrInt(body["request"]["code"]))
 
-        url = buildUrl(purl, guid, data["vkey"])
+        cdnaddr = random.choice(config.get("modules.platform.tx.cdn_list"))
+        url = cdnaddr + purl
 
         return UrlResponse(
             url=url,
             quality=quality,
         )
     except Exception as e:
-        raise getUrlFailed(e)
+        raise FailedException(e)

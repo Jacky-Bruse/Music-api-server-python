@@ -1,21 +1,21 @@
+import base64
 import re
 import zlib
-import base64
 from typing import Dict, List
-from utils.http import HttpRequest
-from server.exceptions import getLyricFailed
+
+from server.exceptions import FailedException
+from server.models.music import Lyric
+from utils.server.http import send_http_request
 
 
 class KuwoLyricParser:
-    """酷我音乐歌词解析器"""
-
     def __init__(self):
-        self.time_exp = re.compile(r"^\[([\d:.]*)\]")
-        self.exist_time_exp = re.compile(r"\[\d{1,2}:.*\d{1,4}\]")
+        self.time_exp = re.compile(r"^\[([\d:.]*)]")
+        self.exist_time_exp = re.compile(r"\[\d{1,2}:.*\d{1,4}]")
         self.lyricx_tag = re.compile(r"^<-?\d+,-?\d+>")
         self.word_time_all = re.compile(r"<-?\d+,-?\d+(?:,-?\d+)?>")
         self.tag_line = re.compile(
-            r"\[(ver|ti|ar|al|offset|by|kuwo):\s*(\S+(?:\s+\S+)*)\s*\]"
+            r"\[(ver|ti|ar|al|offset|by|kuwo):\s*(\S+(?:\s+\S+)*)\s*]"
         )
 
         self.buf_key = b"yeelion"
@@ -23,7 +23,6 @@ class KuwoLyricParser:
         self.offset2 = 1
 
     def build_params(self, music_id: int, is_get_lyricx: bool = True) -> str:
-        """构建请求参数"""
         params = (
             f"user=12345,web,web,web&requester=localhost&req=1&rid=MUSIC_{music_id}"
         )
@@ -45,7 +44,6 @@ class KuwoLyricParser:
         return base64.b64encode(output).decode("utf-8")
 
     def decode_lyric(self, data: bytes, is_get_lyricx: bool = True) -> str:
-        """解码歌词数据"""
         if not data.startswith(b"tp=content"):
             return ""
 
@@ -54,7 +52,7 @@ class KuwoLyricParser:
             return ""
 
         try:
-            lrc_data = zlib.decompress(data[separator_index + 4 :])
+            lrc_data = zlib.decompress(data[separator_index + 4:])
         except:
             return ""
 
@@ -79,7 +77,6 @@ class KuwoLyricParser:
         return output.decode("gb18030", errors="ignore")
 
     def sort_lrc_arr(self, arr: List[Dict]) -> Dict:
-        """排序歌词数组并分离翻译歌词"""
         lrc_set = set()
         lrc = []
         lrc_t = []
@@ -106,7 +103,6 @@ class KuwoLyricParser:
         return {"lrc": lrc, "lrcT": lrc_t}
 
     def transform_lrc(self, tags: List[str], lrclist: List[Dict]) -> str:
-        """转换歌词为字符串格式"""
         if not lrclist:
             return "\n".join(tags) + "\n暂无歌词" if tags else "暂无歌词"
 
@@ -117,7 +113,6 @@ class KuwoLyricParser:
         return "\n".join(lines)
 
     def parse_lrc(self, lrc: str) -> Dict:
-        """解析LRC格式歌词"""
         lines = lrc.split("\n")
         tags = []
         lrc_arr = []
@@ -157,7 +152,7 @@ class KuwoLyricParser:
         try:
             lrc_info = self.sort_lrc_arr(lrc_arr)
         except ValueError:
-            raise getLyricFailed("Get lyric failed")
+            raise FailedException("Get lyric failed")
 
         result = {
             "lyric": self.transform_lrc(tags, lrc_info["lrc"]),
@@ -177,23 +172,20 @@ class KuwoLyricParser:
         result["lyric"] = self.word_time_all.sub("", result["lyric"])
 
         if not self.exist_time_exp.search(result["lyric"]):
-            raise getLyricFailed("Get lyric failed")
+            raise FailedException("Get lyric failed")
 
         return result
 
     def parse_lx_lyric(self, lrc: str) -> str:
-        """解析逐字歌词（简化版）"""
         return lrc
 
     def time_to_seconds(self, time_str: str) -> float:
-        """将时间字符串转换为秒数 [mm:ss.ms] -> seconds"""
         if not time_str:
             return 0.0
 
         parts = time_str.split(":")
         if len(parts) != 2:
             return 0.0
-
         try:
             minutes = int(parts[0])
             seconds_parts = parts[1].split(".")
@@ -210,7 +202,6 @@ class KuwoLyricParser:
             return 0.0
 
     def parse_lyric_by_second(self, lrc: str) -> List[Dict]:
-        """解析歌词为按秒格式"""
         if not lrc:
             return []
 
@@ -241,31 +232,29 @@ class KuwoLyricParser:
 
 
 class KuwoLyricFetcher:
-    """酷我音乐歌词获取器"""
 
     def __init__(self):
         self.parser = KuwoLyricParser()
 
     async def get_lyric(self, music_id: int, is_get_lyricx: bool = True) -> Dict:
-        """获取歌词"""
-        url = f"http://newlyric.kuwo.cn/newlyric.lrc?{self.parser.build_params(music_id, is_get_lyricx)}"
+        url = f"https://newlyric.kuwo.cn/newlyric.lrc?{self.parser.build_params(music_id, is_get_lyricx)}"
 
         try:
-            response = await HttpRequest(url)
+            response = await send_http_request(url)
 
             if response.status_code != 200:
-                raise getLyricFailed(f"HTTP Error: {response.status_code}")
+                raise FailedException(f"HTTP Error: {response.status_code}")
 
             decoded_lrc = self.parser.decode_lyric(response.content, is_get_lyricx)
             if not decoded_lrc:
-                raise getLyricFailed("Decode lyric failed")
+                raise FailedException("Decode lyric failed")
 
             return self.parser.parse_lrc(decoded_lrc)
 
-        except getLyricFailed:
+        except FailedException:
             raise
         except Exception as e:
-            raise getLyricFailed(f"Get lyric failed: {str(e)}")
+            raise FailedException(f"Get lyric failed: {str(e)}")
 
 
 _fetcher = KuwoLyricFetcher()
@@ -273,25 +262,15 @@ _fetcher = KuwoLyricFetcher()
 global_parser = KuwoLyricParser()
 
 
-async def getLyric(songId: int | str) -> dict:
-    """获取酷我音乐歌词（兼容接口）"""
+async def getLyric(songId: str) -> Lyric:
     if not str(songId).isdigit():
-        raise getLyricFailed("无效的歌曲ID")
+        raise FailedException("无效的歌曲ID")
 
     music_id = int(songId)
     result = await _fetcher.get_lyric(music_id, is_get_lyricx=True)
-    formated_second_lyric = []
 
-    second_lyric = global_parser.parse_lyric_by_second(result.get("lyric", ""))
-    for x in second_lyric:
-        x["time"] = str(x["time"])
-        formated_second_lyric.append(x)
-        continue
-
-    return {
-        "lyric": result.get("lyric", ""),
-        "tlyric": result.get("tlyric", ""),
-        "rlyric": "",
-        "lxlyric": result.get("lxlyric", ""),
-        "second_lyric": formated_second_lyric,
-    }
+    return Lyric(
+        lyric=result.get("lyric", ""),
+        trans=result.get("trans", ""),
+        chase=result.get("chase", ""),
+    )

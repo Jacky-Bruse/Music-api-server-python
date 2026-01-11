@@ -1,8 +1,9 @@
 import random
-from utils import http as request
+
 from server.config import config
-from server.models import UrlResponse
-from server.exceptions import getUrlFailed
+from server.exceptions import FailedException
+from server.models.music import UrlResponse
+from utils.server import http as request
 
 tools = {
     "qualityMap": {
@@ -12,11 +13,7 @@ tools = {
         "hires": "4000kflac",
     },
     "qualityMapReverse": {
-        48: "128k",
-        99: "128k",
-        100: "128k",
         128: "128k",
-        192: "128k",
         320: "320k",
         2000: "flac",
         4000: "hires",
@@ -32,7 +29,7 @@ tools = {
 
 async def getUrl(songId: str | int, quality: str) -> UrlResponse:
     try:
-        source = random.choice(config.read("modules.platform.kw.source_list"))
+        source = random.choice(config.get("modules.platform.kw.source_list"))
 
         params = {
             "user": "359307055300426",
@@ -48,9 +45,9 @@ async def getUrl(songId: str | int, quality: str) -> UrlResponse:
 
         params = "&".join([f"{k}={v}" for k, v in params.items()])
 
-        target_url = f"http://mobi.kuwo.cn/mobi.s?{params}"
+        target_url = f"https://mobi.kuwo.cn/mobi.s?{params}"
 
-        req = await request.HttpRequest(
+        req = await request.send_http_request(
             target_url,
             {
                 "method": "GET",
@@ -59,18 +56,12 @@ async def getUrl(songId: str | int, quality: str) -> UrlResponse:
         )
 
         if req.json()["code"] != 200:
-            raise getUrlFailed("网络请求错误")
+            raise FailedException("网络请求错误")
 
         body = req.json()["data"]
 
         url = str(body["url"])
         bitrate = int(body["bitrate"])
-
-        if not url:
-            raise getUrlFailed("获取URL失败")
-
-        if bitrate > 4000:
-            raise getUrlFailed("返回了加密文件")
 
         quality = (
             tools["qualityMapReverse"].get(bitrate)
@@ -83,4 +74,4 @@ async def getUrl(songId: str | int, quality: str) -> UrlResponse:
             quality=quality,
         )
     except Exception as e:
-        raise getUrlFailed(e.args)
+        raise FailedException(e)

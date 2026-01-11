@@ -1,12 +1,14 @@
 import time
-from server.models import SongInfo
-from utils import http as request
-from server.exceptions import getSongInfoFailed
+
+from server.exceptions import FailedException
+from server.models.music import SongInfo, KGSpecial
+from utils.platform import formatPlayTime
+from utils.server import http as request
 
 
 async def getMusicInfo(hash_):
     tn = int(time.time())
-    url = "http://gateway.kugou.com/v3/album_audio/audio"
+    url = "https://gateway.kugou.com/v3/album_audio/audio"
     options = {
         "method": "POST",
         "headers": {
@@ -31,22 +33,20 @@ async def getMusicInfo(hash_):
             "data": [{"hash": hash_}],
         },
     }
-    body = await request.HttpRequest(url, dict(options))
+    body = await request.send_http_request(url, dict(options))
     body = body.json()
     data = body["data"][0][0] if (body["data"] and body["data"][0]) else None
     if not data:
-        raise getSongInfoFailed()
+        raise FailedException("歌曲不存在")
     return (
         SongInfo(
             songId=data.get("audio_id"),
             songName=data.get("ori_audio_name"),
             artistName=data.get("author_name"),
             albumName=data.get("album_info", {}).get("album_name"),
-            hash=data.get("audio_info", {}).get("hash"),
             albumId=data.get("album_info", {}).get("album_id"),
-            albumAudioId=data.get("album_audio_id"),
             duration=(
-                int(int(data.get("audio_info", {}).get("timelength", 0)) / 1000)
+                formatPlayTime(int(data.get("audio_info", {}).get("timelength", 0)) / 1000)
                 if data.get("audio_info", {}).get("timelength")
                 else None
             ),
@@ -57,6 +57,9 @@ async def getMusicInfo(hash_):
                 if data.get("album_info", {}).get("sizable_cover")
                 else None
             ),
+            kg=KGSpecial(
+                hash=data.get("audio_info", {}).get("hash"), albumAudioId=data.get("album_audio_id"),
+            )
         ),
         data,
     )

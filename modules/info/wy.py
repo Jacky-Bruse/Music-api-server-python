@@ -1,20 +1,19 @@
-from utils import orjson
-from modules.lyric.wy import getLyric
-from modules.plat.wy import eEncrypt
-from server.models import SongInfo
-from utils.http import HttpRequest
-from server.exceptions import getSongInfoFailed
-from modules.plat import formatPlayTime, formatSinger
+from server.exceptions import FailedException
+from server.models.music import SongInfo
+from utils.encode import json
+from utils.platform import formatPlayTime, formatSinger
+from utils.platform.wy import eEncrypt
+from utils.server.http import send_http_request
 
 
 async def getMusicInfo(songId: str):
     path = "/api/v3/song/detail"
-    url = "http://interface.music.163.com/eapi/v3/song/detail"
+    url = "https://interface.music.163.com/eapi/v3/song/detail"
     params = {
-        "c": [orjson.dumps({"id": songId})],
+        "c": [json.dumps({"id": songId})],
         "ids": [songId],
     }
-    infoRequest = await HttpRequest(
+    infoRequest = await send_http_request(
         url,
         {
             "method": "POST",
@@ -25,14 +24,9 @@ async def getMusicInfo(songId: str):
     infoBody = infoRequest.json()
 
     if infoBody["code"] != 200:
-        raise getSongInfoFailed("获取音乐信息失败")
+        raise FailedException("获取音乐信息失败")
 
     info = infoBody["songs"][0]
-
-    try:
-        lyric = await getLyric(songId)
-    except:
-        lyric = None
 
     return SongInfo(
         songId=info.get("id"),
@@ -46,5 +40,4 @@ async def getMusicInfo(songId: str):
             else None
         ),
         coverUrl=info.get("al", {}).get("picUrl"),
-        lyric=lyric,
     )

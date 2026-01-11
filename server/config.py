@@ -1,175 +1,247 @@
 import os
-import sys
-import redis
-from utils import orjson
-from utils import log
-from . import variable
-from . import default
-from .exceptions import (
+import threading
+from pathlib import Path
+from typing import Any
+
+from server import default
+from server.exceptions import (
     ConfigWriteException,
     ConfigReadException,
     ConfigGenerateException,
 )
-from .exceptions import CacheReadException, CacheWriteException, CacheDeleteException
+from utils.encode import json
+from utils.server import log
 
 
 class ConfigManager:
-    def __init__(self):
+    def __init__(self, config_dir: str = "./data", config_file: str = "config.json"):
+        """
+        初始化配置管理器
+
+        Args:
+            config_dir: 配置文件目录
+            config_file: 配置文件名
+        """
         self.logger = log.createLogger("Config")
-        self.config = {}
+        self._lock = threading.RLock()
 
-        os.makedirs("./data", mode=511, exist_ok=True)
+        self.config_dir = Path(config_dir)
+        self.config_path = self.config_dir / config_file
+        self.temp_config_path = self.config_dir / f"{config_file}.tmp"
 
-        self.generate()
-        self.initConfig()
+        self.config: dict = {}
 
+        self._ensure_config_dir()
+
+        self._init_config()
         self.logger.info("已初始化配置管理器")
 
-    def initConfig(self):
+    def _ensure_config_dir(self) -> None:
+        """确保配置目录存在"""
+        self.config_dir.mkdir(mode=0o777, parents=True, exist_ok=True)
+
+    def _init_config(self) -> None:
+        """初始化配置文件"""
+        if not self.config_path.exists():
+            self.logger.warning("配置文件不存在，创建默认配置")
+            self._generate_default_config()
+            return
+
         try:
-            with open("./data/config.json", "r", encoding="utf-8") as f:
-                self.config = orjson.load(f)
-        except FileNotFoundError:
-            self.config = default.default
+            self._load_config()
+        except Exception as e:
+            self.logger.error(f"配置文件加载失败: {e}，使用默认配置")
+            self.config = default.default.copy()
 
-        self.logger.info("配置文件加载成功")
+    def _load_config(self) -> None:
+        """从文件加载配置"""
+        with self._lock:
+            content = self.config_path.read_text(encoding="utf-8")
 
-    def generate(self):
-        if not os.path.exists("./data/config.json"):
-            try:
-                with open("./data/config.json", "w", encoding="utf-8") as f:
-                    orjson.dump(
-                        default.default,
-                        f,
+            if not content.strip():
+                self.logger.warning("配置文件为空，重新生成默认配置")
+                self._generate_default_config()
+                return
+
+            self.config = json.loads(content)
+            self.logger.info("配置文件加载成功")
+
+    def _generate_default_config(self) -> None:
+        """生成默认配置文件"""
+        try:
+            with self._lock:
+                self.config_path.write_text(
+                    json.dumps(default.default, indent_2=True),
+                    encoding="utf-8"
+                )
+                self.config = default.default.copy()
+
+                if not os.getenv("build"):
+                    self.logger.warning(
+                        f"已创建默认配置文件，请修改 {self.config_path.absolute()} 后重新启动"
                     )
-                    f.close()
-                    if not os.getenv("build"):
-                        self.logger.warning(
-                            "首次启动或配置文件被删除，已创建默认配置文件"
-                        )
-                        path = f"{variable.work_dir + os.path.sep}data/config.json".replace(
-                            "\\", "/"
-                        )
-                        self.logger.warning(
-                            f"\n建议您到{path}修改配置后重新启动服务器"
-                            f"\n如果识别有误, 请在app.py所在的文件夹找data文件夹"
-                        )
                     os._exit(1)
-            except BaseException as e:
-                self.logger.error("配置生成异常...")
-                raise ConfigGenerateException(e)
 
-    def read(self, key) -> str | dict | list | None:
+        except Exception as e:
+            self.logger.error(f"配置生成失败: {e}")
+            raise ConfigGenerateException(e)
+
+    def get(self, key: str, default_value: Any = None) -> Any:
+        """
+        获取配置项
+
+        Args:
+            key: 配置键，支持点号分隔的嵌套键（如 'server.port'）
+            default_value: 键不存在时的默认值
+
+        Returns:
+            配置值或默认值
+        """
         try:
-            config = self.config
-            keys = key.split(".")
-            value = config
-            for k in keys:
-                if isinstance(value, dict):
-                    if k not in value and keys.index(k) != len(keys) - 1:
-                        value[k] = {}
-                        value = value[k]
-                    elif k not in value and keys.index(k) == len(keys) - 1:
-                        value = None
-                        break
-                    else:
-                        value = value[k]
-                else:
-                    value = None
-                    break
+            with self._lock:
+                keys = key.split(".")
+                value = self.config
 
-            return value
-        except BaseException as e:
-            self.logger.error(f"配置读取失败: key={key}, error={e}")
+                for k in keys:
+                    if isinstance(value, dict) and k in value:
+                        value = value[k]
+                    else:
+                        return default_value
+
+                return value
+
+        except Exception as e:
+            self.logger.error(f"配置读取失败 [{key}]: {e}")
             raise ConfigReadException(e)
 
-    def write(self, key: str, value: str | dict | list):
+    def set(self, key: str, value: Any) -> None:
+        """
+        设置配置项并保存到文件
+
+        Args:
+            key: 配置键，支持点号分隔的嵌套键
+            value: 配置值
+        """
         try:
-            with open("./data/config.json", "r", encoding="utf-8") as f:
-                config = orjson.load(f)
+            with self._lock:
+                if self.config_path.exists():
+                    config = json.loads(self.config_path.read_text(encoding="utf-8"))
+                else:
+                    config = {}
 
-            keys = key.split(".")
-            current = config
-            for k in keys[:-1]:
-                if k not in current:
-                    current[k] = {}
-                current = current[k]
+                keys = key.split(".")
+                current = config
 
-            current[keys[-1]] = value
-            self.config = config
+                for k in keys[:-1]:
+                    if k not in current or not isinstance(current[k], dict):
+                        current[k] = {}
+                    current = current[k]
 
-            with open("./data/config.json", "w", encoding="utf-8") as f:
-                orjson.dump(
-                    config,
-                    f,
-                )
-                f.close()
-        except BaseException as e:
-            self.logger.error("配置写入失败...")
+                current[keys[-1]] = value
+
+                self._atomic_write(config)
+
+                self.config = config
+
+        except Exception as e:
+            self.logger.error(f"配置写入失败 [{key}]: {e}")
+            self._cleanup_temp_file()
+            raise ConfigWriteException(e)
+
+    def _atomic_write(self, config: dict) -> None:
+        """
+        原子性写入配置文件
+
+        Args:
+            config: 配置字典
+        """
+        self.temp_config_path.write_text(
+            json.dumps(config, indent_2=True),
+            encoding="utf-8"
+        )
+
+        self.temp_config_path.replace(self.config_path)
+
+    def _cleanup_temp_file(self) -> None:
+        """清理临时文件"""
+        try:
+            if self.temp_config_path.exists():
+                self.temp_config_path.unlink()
+        except Exception as e:
+            self.logger.warning(f"清理临时文件失败: {e}")
+
+    def reload(self) -> None:
+        """重新加载配置文件"""
+        self.logger.info("重新加载配置文件")
+        self._load_config()
+
+    def update(self, updates: dict) -> None:
+        """
+        批量更新配置项
+
+        Args:
+            updates: 要更新的配置字典
+        """
+        try:
+            with self._lock:
+                def deep_merge(base: dict, updates: dict) -> dict:
+                    for key, value in updates.items():
+                        if key in base and isinstance(base[key], dict) and isinstance(value, dict):
+                            deep_merge(base[key], value)
+                        else:
+                            base[key] = value
+                    return base
+
+                config = self.config.copy() if self.config else {}
+                config = deep_merge(config, updates)
+
+                self._atomic_write(config)
+                self.config = config
+
+        except Exception as e:
+            self.logger.error(f"批量更新配置失败: {e}")
+            self._cleanup_temp_file()
+            raise ConfigWriteException(e)
+
+    def has(self, key: str) -> bool:
+        """
+        检查配置项是否存在
+
+        Args:
+            key: 配置键
+
+        Returns:
+            是否存在
+        """
+        return self.get(key, default_value=object()) is not object()
+
+    def delete(self, key: str) -> None:
+        """
+        删除配置项
+
+        Args:
+            key: 配置键
+        """
+        try:
+            with self._lock:
+                keys = key.split(".")
+                config = self.config.copy()
+                current = config
+
+                for k in keys[:-1]:
+                    if k not in current or not isinstance(current[k], dict):
+                        return
+                    current = current[k]
+
+                if keys[-1] in current:
+                    del current[keys[-1]]
+                    self._atomic_write(config)
+                    self.config = config
+
+        except Exception as e:
+            self.logger.error(f"删除配置失败 [{key}]: {e}")
+            self._cleanup_temp_file()
             raise ConfigWriteException(e)
 
 
 config = ConfigManager()
-
-
-class CacheManager:
-    def __init__(self):
-        self.logger = log.createLogger("Cache")
-        self.redis = self.connect()
-        self.logger.info("已初始化缓存管理器")
-
-    def connect(self):
-        try:
-            host = config.read("cache.host")
-            port = config.read("cache.port")
-            user = config.read("cache.user")
-            password = config.read("cache.password")
-            db = config.read("cache.db")
-            client = redis.Redis(
-                host=host, port=port, username=user, password=password, db=db
-            )
-            if not client.ping():
-                raise ConnectionError("Redis ping 检测失败，连接不可用")
-            return client
-        except Exception as e:
-            self.logger.error(f"连接Redis缓存数据库失败: {e}")
-            sys.exit(1)
-
-    def buildKey(self, module: str, key: str):
-        prefix = config.read("cache.key_prefix")
-        return f"{prefix}:{module}:{key}"
-
-    def get(self, module: str, key: str):
-        try:
-            key = self.buildKey(module, key)
-            result = self.redis.get(key)
-            if result:
-                cache_data = orjson.loads(result)
-                return cache_data
-        except BaseException as e:
-            self.logger.error("缓存读取遇到错误…")
-            raise CacheReadException(e)
-
-    def set(self, module: str, key: str, data: str | dict | list, expire: int = None):
-        try:
-            key = self.buildKey(module, key)
-            self.redis.set(
-                key, orjson.dumps(data), ex=expire if expire and expire > 0 else None
-            )
-        except BaseException as e:
-            self.logger.error("缓存写入遇到错误…")
-            raise CacheWriteException(e)
-
-    def delete(self, module: str, key: str):
-        try:
-            key = self.buildKey(module, key)
-            self.redis.delete(key)
-        except BaseException as e:
-            self.logger.error("缓存删除遇到错误…")
-            raise CacheDeleteException(e)
-
-
-cache = None
-
-if config.read("cache.enable"):
-    cache = CacheManager()

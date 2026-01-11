@@ -1,12 +1,11 @@
 {
   "name": "lx-music-api-server",
-  "version": "3.0.2",
-  "description": "LX Music Api Server",
+  "version": "3.0.3",
+  "description": "Unofficial LX Music 's Backend. Uses: FastAPI, Uvicorn, Aiohttp",
   "main": "main.py",
   "scripts": {
-    "start": "poetry run python main.py",
-    "clean": "python clean.py",
-    "install": "poetry install"
+    "start": "uv run main.py",
+    "clean": "python clean.py"
   },
   "repository": {
     "type": "git",
@@ -16,9 +15,5 @@
     "music"
   ],
   "author": "MeoProject",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/MeoProject/lx-music-api-server/issues"
-  },
-  "homepage": "https://github.com/MeoProject/lx-music-api-server"
+  "license": "MIT"
 }

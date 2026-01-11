@@ -1,12 +1,48 @@
-from utils import log
 from server.config import config
-from modules.plat.tx.utils import signRequest
-from modules.plat.tx import build_comm
+from utils.platform.tx import build_comm
+from utils.platform.tx import sign_request
+from utils.server import log
 
 logger = log.createLogger("Refresh Login")
 
 
-async def refreshLogin(user_info):
+async def check_vip(user_info):
+    options = {"req": {
+        "module": "VipLogin.VipLoginInter",
+        "method": "vip_login_base",
+        "param": {},
+    }, "comm": await build_comm(user_info)}
+
+    req = await sign_request(options)
+    body = req.json()
+
+    if body["req"]["code"] != 0:
+        logger.warning(
+            f"为QQ音乐官方账号({user_info['uin']})检查VIP状态失败, code: "
+            + str(body["req"]["code"])
+            + f"\n响应体: {body}"
+        )
+        vipType = "normal"
+    else:
+        data = body["req"]["data"]["identity"]
+        if bool(data["HugeVip"]):
+            vipType = "svip"
+            logger.info(
+                f"QQ音乐官方账号({user_info['uin']})当前是SVIP，过期时间：{data['HugeVipEnd']}"
+            )
+        elif bool(data["LMFlag"]):
+            vipType = "vip"
+            logger.info(
+                f"QQ音乐官方账号({user_info['uin']})当前是绿钻VIP，过期时间：{data['LMEnd']}"
+            )
+        else:
+            vipType = "normal"
+            logger.warning(f"QQ音乐官方账号({user_info['uin']})不是VIP")
+
+    return vipType
+
+
+async def refresh_login(user_info):
     if user_info["uin"] in [0, "", "0"]:
         return
     if user_info["token"] == "":
@@ -29,14 +65,9 @@ async def refreshLogin(user_info):
                 "loginMode": 2,
             },
         },
-        "req_2": {
-            "module": "VipLogin.VipLoginInter",
-            "method": "vip_login_base",
-            "param": {},
-        },
     }
 
-    req = await signRequest(params)
+    req = await sign_request(params)
     body = req.json()
 
     if body["req"]["code"] != 0:
@@ -49,7 +80,7 @@ async def refreshLogin(user_info):
     else:
         logger.info(f"为QQ音乐官方账号({user_info['uin']})刷新登录成功")
 
-        user_list = config.read("modules.platform.tx.users")
+        user_list = config.get("modules.platform.tx.users")
 
         user_index = None
         for i, user in enumerate(user_list):
@@ -62,34 +93,15 @@ async def refreshLogin(user_info):
         user_list[user_index]["openId"] = str(body["req"]["data"]["openid"])
         user_list[user_index]["accessToken"] = str(body["req"]["data"]["access_token"])
         user_list[user_index]["refreshKey"] = str(body["req"]["data"]["refresh_key"])
+        user_list[user_index]["vipType"] = await check_vip(
+            {
+                "uin": user_list[user_index]["uin"],
+                "openId": user_list[user_index]["openId"],
+                "accessToken": user_list[user_index]["accessToken"],
+                "token": user_list[user_index]["token"],
+                "refreshKey": user_list[user_index]["refreshKey"],
+            }
+        )
 
-        if body["req_2"]["code"] != 0:
-            logger.warning(
-                f"为QQ音乐官方账号({user_info['uin']})检查VIP状态失败, code: "
-                + str(body["req_2"]["code"])
-                + f"\n响应体: {body}"
-            )
-            vipType = "normal"
-        else:
-            data = body["req_2"]["data"]["identity"]
-            if bool(data["HugeVip"]):
-                vipType = "svip"
-                logger.info(
-                    f"QQ音乐官方账号({user_info['uin']})当前是SVIP，过期时间：{data['HugeVipEnd']}"
-                )
-            elif bool(data["LMFlag"]):
-                vipType = "vip"
-                logger.info(
-                    f"QQ音乐官方账号({user_info['uin']})当前是绿钻VIP，过期时间：{data['LMEnd']}"
-                )
-            elif bool(data["vip"]):
-                vipType = "vip"
-                logger.warning(f"QQ音乐官方账号({user_info['uin']})可能是绿钻VIP")
-            else:
-                vipType = "normal"
-                logger.warning(f"QQ音乐官方账号({user_info['uin']})不是VIP")
-
-        user_list[user_index]["vipType"] = vipType
-
-        config.write("modules.platform.tx.users", user_list)
+        config.set("modules.platform.tx.users", user_list)
         logger.info(f"为QQ音乐官方账号({user_info['uin']})数据更新完毕")

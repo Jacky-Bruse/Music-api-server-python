@@ -21,17 +21,11 @@ PS: 主开发(@helloplhm-qwq)因学业原因无法维护项目, 在 2026 年 6 �
 
 - [ ] 主要功能：
 
-  - [x] 链接获取(kw,kg,tx,wy,mg)
-  - [x] 详情获取(kw,kg,tx,wy,mg)
-  - [x] 歌词获取(kw,kg,tx,wy,mg)
+  - [x] 链接获取(kw,kg,tx,wy)
+  - [x] 详情获取(kw,kg,tx,wy)
+  - [x] 歌词获取(kw,kg,tx,wy)
   - [x] 刷新登录(kg,tx)(只有这俩必须刷新)
-
-  - [ ] 搜索(计划外)
-  - [ ] i18n(计划外)
-
-- [x] 特别功能:
-  - [x] [数据已删除]加密(第二版)解密
-  - [x] 歌词适配完整 API(链接获取,更新,赞助,闪屏)
+  - [ ] 搜索(可能会在近期实现)
 
 ## 💻 部署方法
 
@@ -39,7 +33,7 @@ PS: 主开发(@helloplhm-qwq)因学业原因无法维护项目, 在 2026 年 6 �
 ≥Python 3.10  
 ≥Redis 6.0  
 UV  
-不推荐 Red hat 系, 推荐 Debian 系和 Windows，最省事  
+不推荐 Red hat 系, 推荐 Debian 系，最省事  
 非必要: Node.js
 
 1. 安装 uv
