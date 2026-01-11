@@ -10,13 +10,11 @@ RUN pip install --no-cache-dir -i https://pypi.mirrors.ustc.edu.cn/simple/ .
 
 # 第二阶段：复制应用代码（代码变化不会导致依赖重装）
 COPY main.py ./main.py
-COPY api ./api
-COPY crypt ./crypt
+COPY routers ./routers
 COPY middleware ./middleware
 COPY modules ./modules
 COPY server ./server
 COPY utils ./utils
 COPY static ./static
-COPY res ./res
 
 CMD [ "python", "main.py" ]
